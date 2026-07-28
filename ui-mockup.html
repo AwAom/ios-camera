@@ -61,7 +61,7 @@
   }
 
   .page-head {
-    max-width: 560px;
+    max-width: 620px;
     text-align: center;
     display: flex;
     flex-direction: column;
@@ -88,14 +88,15 @@
     font-size: 12px;
   }
 
-  /* ---------- device frame ---------- */
+  /* ---------- device frame (landscape-only, matches Info.plist) ---------- */
   .device {
     position: relative;
-    width: 390px;
-    height: 844px;
+    width: 844px;
+    height: 390px;
+    max-width: 100%;
     background: var(--phone-bezel);
-    border-radius: 55px;
-    padding: 14px;
+    border-radius: 46px;
+    padding: 12px;
     box-shadow:
       0 0 0 2px var(--phone-bezel-edge),
       0 30px 60px -20px rgba(0, 0, 0, 0.45),
@@ -106,18 +107,20 @@
     position: relative;
     width: 100%;
     height: 100%;
-    border-radius: 42px;
+    border-radius: 34px;
     overflow: hidden;
     background: #000;
     isolation: isolate;
   }
+  /* Dynamic island sits on the physical top edge of the device, which is
+     the left edge once rotated into landscape. */
   .dynamic-island {
     position: absolute;
-    top: 12px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 124px;
-    height: 34px;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 34px;
+    height: 124px;
     background: #000;
     border-radius: 20px;
     z-index: 50;
@@ -134,8 +137,8 @@
     position: absolute;
     inset: 0;
     background:
-      radial-gradient(120% 90% at 32% 20%, rgba(255,255,255,0.10), transparent 55%),
-      radial-gradient(140% 110% at 70% 85%, rgba(255,255,255,0.06), transparent 60%),
+      radial-gradient(90% 120% at 20% 30%, rgba(255,255,255,0.10), transparent 55%),
+      radial-gradient(110% 140% at 75% 80%, rgba(255,255,255,0.06), transparent 60%),
       repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 42px),
       repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0 1px, transparent 1px 42px),
       linear-gradient(160deg, #2b2f36 0%, #14161a 55%, #0a0b0d 100%);
@@ -181,24 +184,26 @@
     inset: 0;
     display: flex;
     flex-direction: column;
-    padding-top: 54px;
+    padding: 14px 16px 12px;
+    padding-left: 56px; /* clears the dynamic island on the left edge */
     z-index: 20;
     transition: opacity 0.15s ease;
     color: #fff;
   }
   .hud.hidden { opacity: 0; pointer-events: none; }
 
-  .hud-top {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 16px;
-  }
-  .hud-row {
+  .hud-top-row {
     display: flex;
     align-items: flex-start;
+    justify-content: space-between;
     gap: 8px;
   }
+  .hud-bottom-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .hud-spacer { flex: 1; }
 
   .chip {
     padding: 8px 10px;
@@ -214,11 +219,6 @@
     gap: 4px;
     align-items: flex-start;
   }
-  .info-format {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 13px;
-    color: #fff;
-  }
   .info-stream {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 11px;
@@ -232,14 +232,12 @@
     display: none;
   }
 
-  .btn-row {
+  .top-right-stack {
     display: flex;
+    flex-direction: column;
+    align-items: flex-end;
     gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 2px;
-    scrollbar-width: none;
   }
-  .btn-row::-webkit-scrollbar { display: none; }
 
   .btn {
     flex-shrink: 0;
@@ -250,27 +248,26 @@
     background: rgba(0,0,0,0.5);
     border-radius: 8px;
     font-size: 13px;
-    color: var(--ios-blue, #0a84ff);
-    border: none;
     font-family: inherit;
+    color: #0a84ff;
+    border: none;
     cursor: pointer;
     white-space: nowrap;
     -webkit-tap-highlight-color: transparent;
   }
+  #qualityBtn { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   .btn svg { width: 15px; height: 15px; flex-shrink: 0; }
   .btn.toggle-on {
     background: #0a84ff;
     color: #fff;
   }
-  .btn.toggle-on.mic { background: #0a84ff; }
   .btn.toggle-on.mjpeg { background: #34c759; color: #fff; }
 
-  .hud-spacer { flex: 1; }
   .hud-caption {
     text-align: center;
     font-size: 11px;
     color: rgba(255,255,255,0.6);
-    padding-bottom: 28px;
+    padding-top: 6px;
   }
 
   /* ---------- menus ---------- */
@@ -278,7 +275,7 @@
   .menu-panel {
     position: absolute;
     top: calc(100% + 6px);
-    left: 0;
+    right: 0;
     min-width: 190px;
     background: rgba(40,40,45,0.92);
     -webkit-backdrop-filter: blur(14px);
@@ -289,6 +286,7 @@
     z-index: 60;
     box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   }
+  .bottom-left .menu-panel { top: auto; bottom: calc(100% + 6px); left: 0; right: auto; }
   .menu-panel.open { display: block; }
   .menu-item {
     display: flex;
@@ -307,7 +305,7 @@
   .menu-item.selected svg { visibility: visible; }
 
   .footnote {
-    max-width: 390px;
+    max-width: 620px;
     font-size: 12px;
     line-height: 1.6;
     color: var(--page-ink-dim);
@@ -319,9 +317,10 @@
   <h1>USBCam — UI Mockup</h1>
   <p>
     Static replica of the live SwiftUI HUD in <code>ContentView.swift</code>, for iterating on
-    layout/spacing without a rebuild + Sideloadly reinstall cycle. Fully interactive: use the
-    chips, open the menus, and double-tap the screen (away from a chip) to test the stealth-mode
-    blackout, same as on device.
+    layout/spacing without a rebuild + Sideloadly reinstall cycle. The app is landscape-only
+    (see <code>Info.plist</code>), so this mockup is too. Fully interactive: use the chips, open
+    the menus, and double-tap the screen (away from a chip) to test the stealth-mode blackout,
+    same as on device.
   </p>
 </div>
 
@@ -339,21 +338,19 @@
     <div class="stealth-overlay" id="stealthOverlay"></div>
 
     <div class="hud" id="hud">
-      <div class="hud-top">
-        <div class="hud-row">
-          <div class="chip info-chip">
-            <div class="info-format" id="formatText">3840x2160 @ 60fps</div>
-            <div class="info-stream" id="streamText">Stream: 14.8 fps · 612 kbps · 1 client(s)</div>
-            <div class="info-error" id="errorText"></div>
-          </div>
-          <div class="hud-spacer"></div>
+      <!-- top row: stream stats/errors top-left, quality+preview stacked top-right -->
+      <div class="hud-top-row">
+        <div class="chip info-chip" id="infoChip" style="display:none;">
+          <div class="info-stream" id="streamText">Stream: 14.8 fps · 612 kbps · 1 client(s)</div>
+          <div class="info-error" id="errorText"></div>
         </div>
+        <div class="hud-spacer"></div>
 
-        <div class="btn-row">
+        <div class="top-right-stack">
           <div class="menu-wrap">
             <button class="btn" id="qualityBtn">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-              <span id="qualityLabel">Auto (best available)</span>
+              <span id="formatText">3840x2160 @ 60fps</span>
             </button>
             <div class="menu-panel" id="qualityMenu">
               <div class="menu-item" data-quality="Auto (best available)" data-format="3840x2160 @ 60fps">
@@ -377,44 +374,50 @@
             </div>
           </div>
 
-          <div class="menu-wrap">
-            <button class="btn" id="cameraBtn">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-              <span id="cameraLabel">Back Camera</span>
-            </button>
-            <div class="menu-panel" id="cameraMenu">
-              <div class="menu-item" data-camera="Back Camera">
-                <span>Back Camera</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
-              </div>
-              <div class="menu-item" data-camera="Back Ultra Wide Camera">
-                <span>Back Ultra Wide Camera</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
-              </div>
-              <div class="menu-item" data-camera="Back Telephoto Camera">
-                <span>Back Telephoto Camera</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
-              </div>
-              <div class="menu-item" data-camera="Front Camera">
-                <span>Front Camera</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
-              </div>
-            </div>
-          </div>
-
           <button class="btn toggle-on" id="previewBtn">
             <svg id="previewIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             <span>Preview</span>
-          </button>
-
-          <button class="btn" id="micBtn">
-            <svg id="micIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9V5a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2M19 10v2a7 7 0 0 1-.11 1.23M12 19v3M8 22h8" /><line x1="1" y1="1" x2="23" y2="23"/></svg>
-            <span>Mic</span>
-          </button>
-
-          <button class="btn" id="mjpegBtn">
-            <span>MJPEG :8080</span>
           </button>
         </div>
       </div>
 
       <div class="hud-spacer"></div>
+
+      <!-- bottom row: camera/mic/mjpeg hugging bottom-left, caption centered below -->
+      <div class="hud-bottom-row">
+        <div class="menu-wrap bottom-left" id="cameraMenuWrap">
+          <button class="btn" id="cameraBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            <span id="cameraLabel">Back Camera</span>
+          </button>
+          <div class="menu-panel" id="cameraMenu">
+            <div class="menu-item" data-camera="Back Camera">
+              <span>Back Camera</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
+            </div>
+            <div class="menu-item" data-camera="Back Ultra Wide Camera">
+              <span>Back Ultra Wide Camera</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
+            </div>
+            <div class="menu-item" data-camera="Back Telephoto Camera">
+              <span>Back Telephoto Camera</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
+            </div>
+            <div class="menu-item" data-camera="Front Camera">
+              <span>Front Camera</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn" id="micBtn">
+          <svg id="micIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3M8 22h8"/></svg>
+          <span>Mic</span>
+        </button>
+
+        <button class="btn" id="mjpegBtn">
+          <span>MJPEG :8080</span>
+        </button>
+
+        <div class="hud-spacer"></div>
+      </div>
+
       <div class="hud-caption">Double-tap anywhere to toggle stealth (black-screen) mode</div>
     </div>
   </div>
@@ -452,10 +455,9 @@
     }
   });
 
-  // ---- quality menu ----
+  // ---- quality menu (button label = resolved format, mirrors CameraManager.activeFormatDescription) ----
   const qualityBtn = document.getElementById('qualityBtn');
   const qualityMenu = document.getElementById('qualityMenu');
-  const qualityLabel = document.getElementById('qualityLabel');
   const formatText = document.getElementById('formatText');
 
   function closeAllMenus() {
@@ -475,7 +477,6 @@
       e.stopPropagation();
       qualityMenu.querySelectorAll('.menu-item').forEach((i) => i.classList.remove('selected'));
       item.classList.add('selected');
-      qualityLabel.textContent = item.dataset.quality;
       formatText.textContent = item.dataset.format;
       qualityMenu.classList.remove('open');
     });
@@ -527,12 +528,12 @@
     e.stopPropagation();
     micOn = !micOn;
     micBtn.classList.toggle('toggle-on', micOn);
-    micBtn.classList.toggle('mic', micOn);
     micIcon.innerHTML = micOn ? micOffPath : micOnPath;
   });
 
   // ---- MJPEG toggle + fake live stats ----
   const mjpegBtn = document.getElementById('mjpegBtn');
+  const infoChip = document.getElementById('infoChip');
   const streamText = document.getElementById('streamText');
   let mjpegOn = false;
   let statsTimer = null;
@@ -543,6 +544,7 @@
     mjpegBtn.classList.toggle('toggle-on', mjpegOn);
     mjpegBtn.classList.toggle('mjpeg', mjpegOn);
     streamText.classList.toggle('visible', mjpegOn);
+    infoChip.style.display = mjpegOn ? 'flex' : 'none';
     if (mjpegOn) {
       statsTimer = setInterval(() => {
         const fps = (13.5 + Math.random() * 2).toFixed(1);

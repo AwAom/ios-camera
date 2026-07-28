@@ -13,9 +13,13 @@ struct ContentView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            CameraPreviewView(session: cameraManager.session, isEnabled: previewEnabled)
-                .ignoresSafeArea()
-                .opacity((stealthMode.isActive || !previewEnabled) ? 0 : 1)
+            CameraPreviewView(
+                session: cameraManager.session,
+                isEnabled: previewEnabled,
+                isMirrored: currentCameraPosition == .front
+            )
+            .ignoresSafeArea()
+            .opacity((stealthMode.isActive || !previewEnabled) ? 0 : 1)
 
             // Pure black OLED overlay: on modern iPhones (OLED panels) this
             // switches the covered pixels off entirely, cutting power draw
@@ -57,125 +61,150 @@ struct ContentView: View {
     }
 
     private var overlayHUD: some View {
-        VStack {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(cameraManager.activeFormatDescription)
-                            .font(.caption.monospaced())
-                        if streamingEnabled {
-                            Text("Stream: \(String(format: "%.1f", streamStats.fps)) fps · \(Int(streamStats.kbps)) kbps · \(streamStats.connectedClients) client(s)")
-                                .font(.caption2.monospaced())
-                                .foregroundColor(.green)
-                        }
-                        if let error = cameraManager.lastError {
-                            Text(error)
-                                .font(.caption2)
-                                .foregroundColor(.red)
-                        }
-                    }
-                    .padding(8)
-                    .background(.black.opacity(0.5))
-                    .cornerRadius(8)
-
-                    Spacer()
-                }
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack {
-                        Menu {
-                            ForEach(CameraManager.QualityPreset.allCases) { preset in
-                                Button {
-                                    cameraManager.setQualityPreset(preset)
-                                } label: {
-                                    if preset == cameraManager.selectedQualityPreset {
-                                        Label(preset.label, systemImage: "checkmark")
-                                    } else {
-                                        Text(preset.label)
-                                    }
-                                }
-                            }
-                        } label: {
-                            Label(cameraManager.selectedQualityPreset.label, systemImage: "gearshape")
-                                .font(.caption)
-                        }
-                        .padding(8)
-                        .background(.black.opacity(0.5))
-                        .cornerRadius(8)
-
-                        if cameraManager.availableCameras.count > 1 {
-                            Menu {
-                                ForEach(cameraManager.availableCameras, id: \.uniqueID) { device in
-                                    Button {
-                                        cameraManager.selectCamera(device)
-                                    } label: {
-                                        if device.uniqueID == cameraManager.currentCameraID {
-                                            Label(device.localizedName, systemImage: "checkmark")
-                                        } else {
-                                            Text(device.localizedName)
-                                        }
-                                    }
-                                }
-                            } label: {
-                                Label(currentCameraName, systemImage: "camera.rotate")
-                                    .font(.caption)
-                            }
-                            .padding(8)
-                            .background(.black.opacity(0.5))
-                            .cornerRadius(8)
-                        }
-
-                        Toggle(isOn: Binding(
-                            get: { previewEnabled },
-                            set: { previewEnabled = $0 }
-                        )) {
-                            Label("Preview", systemImage: previewEnabled ? "eye" : "eye.slash")
-                                .font(.caption)
-                        }
-                        .toggleStyle(.button)
-                        .padding(8)
-                        .background(.black.opacity(0.5))
-                        .cornerRadius(8)
-
-                        Toggle(isOn: Binding(
-                            get: { cameraManager.audioEnabled },
-                            set: { cameraManager.setAudioEnabled($0) }
-                        )) {
-                            Label("Mic", systemImage: cameraManager.audioEnabled ? "mic" : "mic.slash")
-                                .font(.caption)
-                        }
-                        .toggleStyle(.button)
-                        .padding(8)
-                        .background(.black.opacity(0.5))
-                        .cornerRadius(8)
-
-                        Toggle(isOn: $streamingEnabled) {
-                            Text("MJPEG :8080")
-                                .font(.caption)
-                        }
-                        .toggleStyle(.button)
-                        .onChange(of: streamingEnabled) { enabled in
-                            toggleStreaming(enabled)
-                        }
-                        .padding(8)
-                        .background(.black.opacity(0.5))
-                        .cornerRadius(8)
-                    }
-                }
+        VStack(spacing: 0) {
+            // Top row: stream stats/errors at top-left, quality + preview
+            // stacked at top-right.
+            HStack(alignment: .top) {
+                topLeftInfo
+                Spacer()
+                topRightControls
             }
             .padding()
 
             Spacer()
 
+            // Bottom row: everything else, hugging the bottom-left corner.
+            HStack {
+                bottomLeftControls
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 8)
+
             Text("Double-tap anywhere to toggle stealth (black-screen) mode")
                 .font(.caption2)
                 .foregroundColor(.white.opacity(0.6))
-                .padding(.bottom, 24)
+                .padding(.bottom, 16)
+        }
+    }
+
+    @ViewBuilder
+    private var topLeftInfo: some View {
+        if streamingEnabled || cameraManager.lastError != nil {
+            VStack(alignment: .leading, spacing: 4) {
+                if streamingEnabled {
+                    Text("Stream: \(String(format: "%.1f", streamStats.fps)) fps · \(Int(streamStats.kbps)) kbps · \(streamStats.connectedClients) client(s)")
+                        .font(.caption2.monospaced())
+                        .foregroundColor(.green)
+                }
+                if let error = cameraManager.lastError {
+                    Text(error)
+                        .font(.caption2)
+                        .foregroundColor(.red)
+                }
+            }
+            .padding(8)
+            .background(.black.opacity(0.5))
+            .cornerRadius(8)
+        }
+    }
+
+    /// Quality preset + current resolved format merged into one control
+    /// (the button itself always shows the actual resolved format, e.g.
+    /// "3840x2160 @ 60fps", even while the "Auto" preset is selected --
+    /// the dropdown is where you explicitly pick "Auto" vs. a fixed preset).
+    private var topRightControls: some View {
+        VStack(alignment: .trailing, spacing: 8) {
+            Menu {
+                ForEach(CameraManager.QualityPreset.allCases) { preset in
+                    Button {
+                        cameraManager.setQualityPreset(preset)
+                    } label: {
+                        if preset == cameraManager.selectedQualityPreset {
+                            Label(preset.label, systemImage: "checkmark")
+                        } else {
+                            Text(preset.label)
+                        }
+                    }
+                }
+            } label: {
+                Label(cameraManager.activeFormatDescription, systemImage: "gearshape")
+                    .font(.caption)
+            }
+            .padding(8)
+            .background(.black.opacity(0.5))
+            .cornerRadius(8)
+
+            Toggle(isOn: Binding(
+                get: { previewEnabled },
+                set: { previewEnabled = $0 }
+            )) {
+                Label("Preview", systemImage: previewEnabled ? "eye" : "eye.slash")
+                    .font(.caption)
+            }
+            .toggleStyle(.button)
+            .padding(8)
+            .background(.black.opacity(0.5))
+            .cornerRadius(8)
+        }
+    }
+
+    private var bottomLeftControls: some View {
+        HStack(spacing: 8) {
+            if cameraManager.availableCameras.count > 1 {
+                Menu {
+                    ForEach(cameraManager.availableCameras, id: \.uniqueID) { device in
+                        Button {
+                            cameraManager.selectCamera(device)
+                        } label: {
+                            if device.uniqueID == cameraManager.currentCameraID {
+                                Label(device.localizedName, systemImage: "checkmark")
+                            } else {
+                                Text(device.localizedName)
+                            }
+                        }
+                    }
+                } label: {
+                    Label(currentCameraName, systemImage: "camera.rotate")
+                        .font(.caption)
+                }
+                .padding(8)
+                .background(.black.opacity(0.5))
+                .cornerRadius(8)
+            }
+
+            Toggle(isOn: Binding(
+                get: { cameraManager.audioEnabled },
+                set: { cameraManager.setAudioEnabled($0) }
+            )) {
+                Label("Mic", systemImage: cameraManager.audioEnabled ? "mic" : "mic.slash")
+                    .font(.caption)
+            }
+            .toggleStyle(.button)
+            .padding(8)
+            .background(.black.opacity(0.5))
+            .cornerRadius(8)
+
+            Toggle(isOn: $streamingEnabled) {
+                Text("MJPEG :8080")
+                    .font(.caption)
+            }
+            .toggleStyle(.button)
+            .onChange(of: streamingEnabled) { enabled in
+                toggleStreaming(enabled)
+            }
+            .padding(8)
+            .background(.black.opacity(0.5))
+            .cornerRadius(8)
         }
     }
 
     private var currentCameraName: String {
         cameraManager.availableCameras.first(where: { $0.uniqueID == cameraManager.currentCameraID })?.localizedName ?? "Camera"
+    }
+
+    private var currentCameraPosition: AVCaptureDevice.Position? {
+        cameraManager.availableCameras.first(where: { $0.uniqueID == cameraManager.currentCameraID })?.position
     }
 
     private func toggleStreaming(_ enabled: Bool) {

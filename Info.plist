@@ -38,9 +38,12 @@
     <!-- Keep the video pipeline alive and the UI in the correct orientation -->
     <key>UIRequiresFullScreen</key>
     <true/>
+    <!-- Landscape-only: this is a camera-mount/streaming use case, and
+         locking to one orientation family removes the portrait/landscape
+         ambiguity that was causing the preview layer's rotation to mismatch
+         its actual frame (see CameraPreviewView.swift). -->
     <key>UISupportedInterfaceOrientations</key>
     <array>
-        <string>UIInterfaceOrientationPortrait</string>
         <string>UIInterfaceOrientationLandscapeLeft</string>
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
