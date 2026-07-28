@@ -102,6 +102,26 @@ These cost real debugging cycles across a live device — each is load-bearing:
    GitHub Actions run against the file actually being installed — don't
    assume "I downloaded it again" means "I got the new one."
 
+## Commit & push immediately after every edit
+
+**There is no local Mac/Xcode/simulator here — GitHub Actions is the only
+compiler this project has.** An edit that only exists locally is unverified
+and effectively doesn't exist yet. So: as soon as a code change (Swift files,
+`project.yml`, `Info.plist`, or `.github/workflows/build.yml`) is complete
+and self-consistent, commit it and push to `main` right away, without
+stopping to ask for confirmation first. Use a clear, specific commit message
+(what changed and why, matching the style already in `git log`).
+
+This standing authorization covers routine commit-and-push only. It does
+**not** cover force-push, `git reset`/`checkout`/`clean` on existing work,
+rewriting history, or anything else destructive — those still need explicit
+confirmation every time, same as any other repo.
+
+After pushing, don't assume success from a green checkmark alone (see
+gotcha #4 below) — for anything touching runtime behavior, either add a
+build-time check or actually poll the run and inspect the artifact before
+telling the user it's ready to test.
+
 ## CI / release flow
 
 Every push to `main` builds automatically
