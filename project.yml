@@ -33,3 +33,8 @@ targets:
         DEVELOPMENT_TEAM: ""
         ENABLE_BITCODE: NO
         SUPPORTS_MACCATALYST: NO
+        # Force Xcode to use our literal Info.plist verbatim instead of
+        # synthesizing one from INFOPLIST_KEY_* build settings, which would
+        # silently drop NSCameraUsageDescription / NSMicrophoneUsageDescription
+        # and cause an instant TCC crash on launch.
+        GENERATE_INFOPLIST_FILE: NO
