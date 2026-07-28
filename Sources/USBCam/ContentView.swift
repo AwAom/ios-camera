@@ -33,6 +33,9 @@ struct ContentView: View {
             cameraManager.audioEnabled = true
             cameraManager.requestPermissionsAndConfigure()
             UIApplication.shared.isIdleTimerDisabled = true
+            // Trigger the Local Network permission prompt early so the
+            // MJPEG server can actually accept inbound connections later.
+            LocalNetworkPermission.shared.requestIfNeeded()
         }
         .onDisappear {
             cameraManager.stop()

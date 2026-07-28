@@ -9,6 +9,12 @@ struct CameraPreviewView: UIViewRepresentable {
         let view = PreviewUIView()
         view.videoPreviewLayer.session = session
         view.videoPreviewLayer.videoGravity = .resizeAspectFill
+        // This view never needs its own touch handling; leaving interaction
+        // enabled lets it swallow taps meant for the SwiftUI double-tap
+        // gesture on the containing ZStack (most noticeable when the view
+        // is invisible under the stealth-mode black overlay, which then
+        // silently blocks toggling stealth mode back off).
+        view.isUserInteractionEnabled = false
         return view
     }
 
