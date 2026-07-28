@@ -24,6 +24,11 @@ final class MJPEGServer: FrameConsuming {
     private var latestJPEG: Data?
     private let boundary = "usbcamboundary"
 
+    private let stats: StreamStats
+    private var statsWindowStart: TimeInterval = CACurrentMediaTime()
+    private var framesInWindow: Int = 0
+    private var bytesInWindow: Int = 0
+
     /// Downscale + throttle to keep CPU/battery usage low while streaming.
     private var lastFrameSentAt: TimeInterval = 0
     private let minFrameInterval: TimeInterval = 1.0 / 15.0 // cap MJPEG preview at 15fps
@@ -36,8 +41,9 @@ final class MJPEGServer: FrameConsuming {
     /// AVFoundation capture quality itself, only this convenience stream.
     private let maxStreamWidth: CGFloat = 1280
 
-    init(port: UInt16 = 8080) {
+    init(port: UInt16 = 8080, stats: StreamStats) {
         self.port = NWEndpoint.Port(rawValue: port) ?? 8080
+        self.stats = stats
     }
 
     func start() {
@@ -59,18 +65,31 @@ final class MJPEGServer: FrameConsuming {
         listener = nil
         connections.values.forEach { $0.cancel() }
         connections.removeAll()
+        DispatchQueue.main.async { self.stats.reset() }
     }
 
     private func accept(_ connection: NWConnection) {
         let id = ObjectIdentifier(connection)
         connections[id] = connection
+        publishConnectionCount()
         connection.stateUpdateHandler = { [weak self] state in
-            if case .cancelled = state { self?.connections.removeValue(forKey: id) }
-            if case .failed = state { self?.connections.removeValue(forKey: id) }
+            if case .cancelled = state {
+                self?.connections.removeValue(forKey: id)
+                self?.publishConnectionCount()
+            }
+            if case .failed = state {
+                self?.connections.removeValue(forKey: id)
+                self?.publishConnectionCount()
+            }
         }
         connection.start(queue: queue)
         sendHeaders(on: connection)
         readAndDiscardRequest(on: connection)
+    }
+
+    private func publishConnectionCount() {
+        let count = connections.count
+        DispatchQueue.main.async { self.stats.connectedClients = count }
     }
 
     private func readAndDiscardRequest(on connection: NWConnection) {
@@ -97,6 +116,30 @@ final class MJPEGServer: FrameConsuming {
 
         for connection in connections.values {
             connection.send(content: payload, completion: .contentProcessed { _ in })
+        }
+
+        recordStatsSample(byteCount: payload.count)
+    }
+
+    /// Called on `queue` for every frame actually broadcast; flushes a
+    /// fps/kbps sample to the (main-queue) StreamStats once per second.
+    private func recordStatsSample(byteCount: Int) {
+        framesInWindow += 1
+        bytesInWindow += byteCount
+
+        let now = CACurrentMediaTime()
+        let elapsed = now - statsWindowStart
+        guard elapsed >= 1.0 else { return }
+
+        let fps = Double(framesInWindow) / elapsed
+        let kbps = (Double(bytesInWindow) * 8.0 / 1000.0) / elapsed
+        framesInWindow = 0
+        bytesInWindow = 0
+        statsWindowStart = now
+
+        DispatchQueue.main.async {
+            self.stats.fps = fps
+            self.stats.kbps = kbps
         }
     }
 

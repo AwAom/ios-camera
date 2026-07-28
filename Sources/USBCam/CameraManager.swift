@@ -66,12 +66,16 @@ final class CameraManager: NSObject, ObservableObject {
 
     let session = AVCaptureSession()
 
-    /// Enable/disable microphone capture alongside video.
-    var audioEnabled: Bool = true
+    /// Microphone capture is off by default -- most USB-camera use cases
+    /// don't need it, and capturing/encoding audio costs CPU and (for the
+    /// MJPEG/streaming path) bandwidth for no benefit when it's unused.
+    /// Toggle at runtime with `setAudioEnabled`.
+    @Published private(set) var audioEnabled: Bool = false
 
     private let sessionQueue = DispatchQueue(label: "com.example.usbcam.sessionQueue")
     private var videoDevice: AVCaptureDevice?
     private var videoDeviceInput: AVCaptureDeviceInput?
+    private var audioDeviceInput: AVCaptureDeviceInput?
 
     /// Raw frame output, consumed by the optional MJPEG server.
     let videoDataOutput = AVCaptureVideoDataOutput()
@@ -88,12 +92,50 @@ final class CameraManager: NSObject, ObservableObject {
                 self.publishError("Camera access denied.")
                 return
             }
-            if self.audioEnabled {
-                AVCaptureDevice.requestAccess(for: .audio) { _ in
-                    self.sessionQueue.async { self.configureSession() }
+            // Audio is off by default -- only request mic permission (and
+            // add the input) if/when the user explicitly enables it via
+            // setAudioEnabled(true).
+            self.sessionQueue.async { self.configureSession() }
+        }
+    }
+
+    /// Runtime toggle for microphone capture. Requests mic permission the
+    /// first time it's turned on; adds/removes the audio input live
+    /// without tearing down the rest of the session.
+    func setAudioEnabled(_ enabled: Bool) {
+        guard enabled else {
+            sessionQueue.async { [weak self] in
+                guard let self else { return }
+                self.session.beginConfiguration()
+                if let input = self.audioDeviceInput {
+                    self.session.removeInput(input)
+                    self.audioDeviceInput = nil
                 }
-            } else {
-                self.sessionQueue.async { self.configureSession() }
+                self.session.commitConfiguration()
+                DispatchQueue.main.async { self.audioEnabled = false }
+            }
+            return
+        }
+
+        AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
+            guard let self else { return }
+            guard granted else {
+                self.publishError("Microphone access denied.")
+                return
+            }
+            self.sessionQueue.async {
+                self.session.beginConfiguration()
+                defer { self.session.commitConfiguration() }
+                guard self.audioDeviceInput == nil, let mic = AVCaptureDevice.default(for: .audio) else { return }
+                do {
+                    let input = try AVCaptureDeviceInput(device: mic)
+                    guard self.session.canAddInput(input) else { return }
+                    self.session.addInput(input)
+                    self.audioDeviceInput = input
+                    DispatchQueue.main.async { self.audioEnabled = true }
+                } catch {
+                    self.publishError("Failed to enable microphone: \(error)")
+                }
             }
         }
     }
@@ -305,11 +347,15 @@ final class CameraManager: NSObject, ObservableObject {
     }
 
     private func configureAudioInputIfNeeded() throws {
+        // Audio defaults to off (see `audioEnabled`); when it's on, use
+        // setAudioEnabled(true) instead so the input gets added live and
+        // AVCaptureDevice.requestAccess is asked for at the right moment.
         guard audioEnabled else { return }
         guard let mic = AVCaptureDevice.default(for: .audio) else { return }
         let input = try AVCaptureDeviceInput(device: mic)
         if session.canAddInput(input) {
             session.addInput(input)
+            audioDeviceInput = input
         }
     }
 
