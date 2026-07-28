@@ -12,11 +12,52 @@ final class CameraManager: NSObject, ObservableObject {
         case cannotAddInput
         case cannotAddOutput
         case lockFailed(Error)
+        case unsupportedByDevice
+    }
+
+    /// User-selectable capture targets. `.auto` uses the original
+    /// best-effort fallback chain (4K60 -> 4K30 -> 1080p60 -> 1080p30);
+    /// the rest lock to one specific resolution/frame-rate so you can e.g.
+    /// deliberately drop to 1080p30 if 4K60 is too heavy for your use case
+    /// (MJPEG preview streaming in particular is CPU-bound per frame and
+    /// can lag well before the native capture pipeline itself struggles).
+    enum QualityPreset: CaseIterable, Identifiable {
+        case auto
+        case uhd60
+        case uhd30
+        case fullHD60
+        case fullHD30
+        case hd30
+
+        var id: Self { self }
+
+        var target: (width: Int32, height: Int32, fps: Double)? {
+            switch self {
+            case .auto: return nil
+            case .uhd60: return (3840, 2160, 60)
+            case .uhd30: return (3840, 2160, 30)
+            case .fullHD60: return (1920, 1080, 60)
+            case .fullHD30: return (1920, 1080, 30)
+            case .hd30: return (1280, 720, 30)
+            }
+        }
+
+        var label: String {
+            switch self {
+            case .auto: return "Auto (best available)"
+            case .uhd60: return "4K @ 60fps"
+            case .uhd30: return "4K @ 30fps"
+            case .fullHD60: return "1080p @ 60fps"
+            case .fullHD30: return "1080p @ 30fps"
+            case .hd30: return "720p @ 30fps"
+            }
+        }
     }
 
     @Published var isSessionRunning = false
     @Published var activeFormatDescription: String = "Not configured"
     @Published var lastError: String?
+    @Published var selectedQualityPreset: QualityPreset = .auto
 
     /// All physical/virtual cameras this device exposes (ultra-wide, wide,
     /// telephoto, front, and any multi-camera combos), populated on launch.
@@ -80,6 +121,7 @@ final class CameraManager: NSObject, ObservableObject {
     /// Switches the live capture input to a different physical/virtual
     /// camera (e.g. ultra-wide -> telephoto -> front) without tearing down
     /// the rest of the session (audio input, outputs, MJPEG consumers).
+    /// Re-applies whatever quality preset is currently selected.
     func selectCamera(_ device: AVCaptureDevice) {
         sessionQueue.async { [weak self] in
             guard let self else { return }
@@ -100,7 +142,7 @@ final class CameraManager: NSObject, ObservableObject {
                 self.videoDeviceInput = input
                 self.videoDevice = device
 
-                try self.lockBestAvailableFormat(on: device)
+                try self.lockFormat(on: device, preset: self.selectedQualityPreset)
 
                 if let connection = self.videoDataOutput.connection(with: .video), connection.isVideoOrientationSupported {
                     connection.videoOrientation = .landscapeRight
@@ -110,6 +152,24 @@ final class CameraManager: NSObject, ObservableObject {
                 DispatchQueue.main.async { self.currentCameraID = device.uniqueID }
             } catch {
                 self.publishError("Failed to switch camera: \(error)")
+            }
+        }
+    }
+
+    /// User-driven resolution/frame-rate change on the currently active
+    /// camera. Falls back to leaving the previous format in place (with an
+    /// error message) if the device doesn't support the requested preset.
+    func setQualityPreset(_ preset: QualityPreset) {
+        sessionQueue.async { [weak self] in
+            guard let self, let device = self.videoDevice else { return }
+            self.session.beginConfiguration()
+            defer { self.session.commitConfiguration() }
+
+            do {
+                try self.lockFormat(on: device, preset: preset)
+                DispatchQueue.main.async { self.selectedQualityPreset = preset }
+            } catch {
+                self.publishError("\(preset.label) isn't supported on \(device.localizedName) -- keeping the previous setting.")
             }
         }
     }
@@ -174,14 +234,24 @@ final class CameraManager: NSObject, ObservableObject {
         session.addInput(input)
         self.videoDeviceInput = input
 
-        try lockBestAvailableFormat(on: device)
+        try lockFormat(on: device, preset: selectedQualityPreset)
         DispatchQueue.main.async { self.currentCameraID = device.uniqueID }
     }
 
-    /// Locks hardware format to 4K (3840x2160) @ 60fps when available.
-    /// Falls back to 4K @ 30fps, then 1080p @ 60fps, then the device's
-    /// highest available frame rate for its default format.
-    private func lockBestAvailableFormat(on device: AVCaptureDevice) throws {
+    /// Applies a specific quality preset, or (for `.auto`) the best-effort
+    /// fallback chain: 4K60 -> 4K30 -> 1080p60 -> 1080p30 -> device default.
+    private func lockFormat(on device: AVCaptureDevice, preset: QualityPreset) throws {
+        if let target = preset.target {
+            guard let match = bestFormat(for: device, width: target.width, height: target.height, fps: target.fps) else {
+                throw CaptureError.unsupportedByDevice
+            }
+            try apply(format: match.format, fps: target.fps, to: device)
+            DispatchQueue.main.async {
+                self.activeFormatDescription = "\(target.width)x\(target.height) @ \(Int(target.fps))fps"
+            }
+            return
+        }
+
         let targets: [(width: Int32, height: Int32, fps: Double)] = [
             (3840, 2160, 60),
             (3840, 2160, 30),

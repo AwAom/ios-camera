@@ -28,6 +28,14 @@ final class MJPEGServer: FrameConsuming {
     private var lastFrameSentAt: TimeInterval = 0
     private let minFrameInterval: TimeInterval = 1.0 / 15.0 // cap MJPEG preview at 15fps
 
+    /// Encoding a full 4K frame to JPEG on every tick is the actual
+    /// bottleneck behind MJPEG "lag" -- it's expensive regardless of what
+    /// resolution the native capture pipeline is running at. Downscale
+    /// before encoding so the preview stream stays smooth even when the
+    /// main capture is locked to 4K60; this has no effect on the native
+    /// AVFoundation capture quality itself, only this convenience stream.
+    private let maxStreamWidth: CGFloat = 1280
+
     init(port: UInt16 = 8080) {
         self.port = NWEndpoint.Port(rawValue: port) ?? 8080
     }
@@ -102,7 +110,12 @@ final class MJPEGServer: FrameConsuming {
         lastFrameSentAt = now
 
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+        var ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+
+        let scale = min(1.0, maxStreamWidth / ciImage.extent.width)
+        if scale < 1.0 {
+            ciImage = ciImage.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        }
 
         guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return }
         let uiImage = UIImage(cgImage: cgImage)

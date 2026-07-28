@@ -25,6 +25,13 @@ struct ContentView: View {
                 overlayHUD
             }
         }
+        // Explicit content shape: without this, the double-tap gesture has
+        // nothing to register against while stealth mode is active, since
+        // every child view has hit-testing disabled at that point (the
+        // preview intentionally, the black overlay via allowsHitTesting) --
+        // that left the ZStack with no defined tappable area at all, which
+        // is why double-tap could turn stealth mode on but never back off.
+        .contentShape(Rectangle())
         // Double-tap anywhere toggles stealth mode on/off.
         .onTapGesture(count: 2) {
             stealthMode.toggle()
@@ -61,6 +68,26 @@ struct ContentView: View {
                 .cornerRadius(8)
 
                 Spacer()
+
+                Menu {
+                    ForEach(CameraManager.QualityPreset.allCases) { preset in
+                        Button {
+                            cameraManager.setQualityPreset(preset)
+                        } label: {
+                            if preset == cameraManager.selectedQualityPreset {
+                                Label(preset.label, systemImage: "checkmark")
+                            } else {
+                                Text(preset.label)
+                            }
+                        }
+                    }
+                } label: {
+                    Label(cameraManager.selectedQualityPreset.label, systemImage: "gearshape")
+                        .font(.caption)
+                }
+                .padding(8)
+                .background(.black.opacity(0.5))
+                .cornerRadius(8)
 
                 if cameraManager.availableCameras.count > 1 {
                     Menu {
