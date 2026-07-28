@@ -13,8 +13,6 @@ targets:
     deploymentTarget: "15.0"
     sources:
       - path: Sources/USBCam
-    info:
-      path: Info.plist
     settings:
       base:
         PRODUCT_NAME: USBCam
@@ -33,8 +31,10 @@ targets:
         DEVELOPMENT_TEAM: ""
         ENABLE_BITCODE: NO
         SUPPORTS_MACCATALYST: NO
-        # Force Xcode to use our literal Info.plist verbatim instead of
-        # synthesizing one from INFOPLIST_KEY_* build settings, which would
-        # silently drop NSCameraUsageDescription / NSMicrophoneUsageDescription
-        # and cause an instant TCC crash on launch.
+        # Use our literal Info.plist verbatim as a plain build setting
+        # rather than XcodeGen's `info: path:` shorthand -- that shorthand
+        # was silently letting Xcode's modern build system synthesize its
+        # own boilerplate plist instead (dropping NSCameraUsageDescription /
+        # NSMicrophoneUsageDescription and causing an instant TCC crash).
+        INFOPLIST_FILE: Info.plist
         GENERATE_INFOPLIST_FILE: NO
