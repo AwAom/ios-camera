@@ -1,0 +1,63 @@
+name: Build Unsigned IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate --spec project.yml
+
+      - name: Build unsigned .app (generic iOS device)
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project USBCam.xcodeproj \
+            -scheme USBCam \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            clean build
+
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          APP_PATH="build/Build/Products/Release-iphoneos/USBCam.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Build output not found at $APP_PATH"
+            find build/Build/Products -maxdepth 3
+            exit 1
+          fi
+
+          mkdir -p ipa_build/Payload
+          cp -R "$APP_PATH" ipa_build/Payload/
+
+          cd ipa_build
+          zip -r -y ../USBCam.ipa Payload
+          cd ..
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: USBCam-unsigned-ipa
+          path: USBCam.ipa
+          retention-days: 30

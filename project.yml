@@ -1,0 +1,35 @@
+name: USBCam
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+configs:
+  Release: release
+targets:
+  USBCam:
+    type: application
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: Sources/USBCam
+    info:
+      path: Info.plist
+    settings:
+      base:
+        PRODUCT_NAME: USBCam
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.usbcam
+        SWIFT_VERSION: 5.0
+        TARGETED_DEVICE_FAMILY: "1"
+        IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+        # No paid Apple Developer account / no Mac available:
+        # produce a fully unsigned build. Sideloadly (or AltStore) performs
+        # the actual ad-hoc signing on the Windows/Mac side using a free
+        # Apple ID before installing onto a device.
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: ""
+        ENABLE_BITCODE: NO
+        SUPPORTS_MACCATALYST: NO
