@@ -55,6 +55,19 @@ jobs:
           zip -r -y ../USBCam.ipa Payload
           cd ..
 
+      - name: Verify required Info.plist keys are actually bundled
+        run: |
+          set -euo pipefail
+          PLIST="ipa_build/Payload/USBCam.app/Info.plist"
+          for key in NSCameraUsageDescription NSMicrophoneUsageDescription; do
+            if ! /usr/libexec/PlistBuddy -c "Print :$key" "$PLIST" >/dev/null 2>&1; then
+              echo "::error::$key is missing from the built Info.plist -- app will crash on launch (TCC). Check project.yml's INFOPLIST_FILE/GENERATE_INFOPLIST_FILE settings."
+              /usr/libexec/PlistBuddy -c "Print" "$PLIST"
+              exit 1
+            fi
+          done
+          echo "Info.plist contains required privacy usage-description keys."
+
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
